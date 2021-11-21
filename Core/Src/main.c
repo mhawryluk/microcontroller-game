@@ -41,54 +41,35 @@
 #include "usbh_platform.h"
 
 /* USER CODE END Includes */
-
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-
 /* USER CODE END PTD */
-
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 /* USER CODE END PD */
-
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
 ADC_HandleTypeDef hadc3;
-
 CRC_HandleTypeDef hcrc;
-
 DCMI_HandleTypeDef hdcmi;
-
 DMA2D_HandleTypeDef hdma2d;
-
 I2C_HandleTypeDef hi2c1;
 I2C_HandleTypeDef hi2c3;
-
 IWDG_HandleTypeDef hiwdg;
-
 LTDC_HandleTypeDef hltdc;
-
 QSPI_HandleTypeDef hqspi;
-
 RNG_HandleTypeDef hrng;
-
 RTC_HandleTypeDef hrtc;
-
 SAI_HandleTypeDef hsai_BlockA2;
 SAI_HandleTypeDef hsai_BlockB2;
-
 SD_HandleTypeDef hsd1;
 DMA_HandleTypeDef hdma_sdmmc1_rx;
 DMA_HandleTypeDef hdma_sdmmc1_tx;
-
 SPDIFRX_HandleTypeDef hspdif;
-
 SPI_HandleTypeDef hspi2;
-
 TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
@@ -98,15 +79,11 @@ TIM_HandleTypeDef htim8;
 TIM_HandleTypeDef htim10;
 TIM_HandleTypeDef htim11;
 TIM_HandleTypeDef htim12;
-
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart6;
-
 SDRAM_HandleTypeDef hsdram1;
-
 osThreadId defaultTaskHandle;
 /* USER CODE BEGIN PV */
-
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -145,6 +122,7 @@ void StartDefaultTask(void const *argument);
 /* USER CODE BEGIN PFP */
 static void lcd_start(void);
 int moveCursor(int xShift, int yShift);
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -164,6 +142,36 @@ extern USBH_HandleTypeDef hUsbHostFS;
 extern char SDPath[4]; /* SD logical drive path */
 extern FATFS SDFatFS;  /* File system object for SD logical drive */
 extern FIL SDFile;     /* File object for SD */
+
+int max_width = LCD_X_SIZE;
+int max_height = LCD_Y_SIZE;
+
+const int figure_size = 80;
+const int circle_radius = figure_size / 2;
+const int square_size = figure_size;
+const int triangle_height = figure_size;
+const int max_figures_number = 10;
+
+typedef struct {
+    int16_t x;
+    int16_t y;
+    int16_t type;
+    int16_t score;
+    int16_t time_to_live;
+    u_int32_t color;
+} Figure;
+
+Figure figures[max_figures_number];
+int current_figure_idx = 0;
+int score_sum = 0;
+
+void draw_shape(int x, int y, int shape, u_int32_t color);
+void draw_score(int score_sum);
+int inside_rect(int rect_x, int rect_y, int x, int y);
+int inside_circle(int circle_x, int circle_y, int x, int y);
+int sign(int p1_x, int p1_y, int p2_x, int p2_y, int p3_x, int p3_y);
+int inside_triangle(int triangle_x, int triangle_y, int x, int y);
+int point_inside(int x, int y, Figure figures[max_figures_number], int max_figures_idx);
 
 void USBH_HID_EventCallback(USBH_HandleTypeDef *phost) {
     xprintf("hid callback: ");
@@ -244,7 +252,6 @@ void ethernetif_notify_conn_changed(struct netif *netif) {
   */
 int main(void) {
     /* USER CODE BEGIN 1 */
-
     /* USER CODE END 1 */
 
     /* MCU Configuration--------------------------------------------------------*/
@@ -253,14 +260,12 @@ int main(void) {
     HAL_Init();
 
     /* USER CODE BEGIN Init */
-
     /* USER CODE END Init */
 
     /* Configure the system clock */
     SystemClock_Config();
 
     /* USER CODE BEGIN SysInit */
-
     /* USER CODE END SysInit */
 
     /* Initialize all configured peripherals */
@@ -296,8 +301,6 @@ int main(void) {
     MX_TIM11_Init();
     /* USER CODE BEGIN 2 */
     debug_init(&huart1);
-    xprintf(ANSI_FG_DEFAULT ANSI_BG_DEFAULT "\n\n" ANSI_BG_BLUE "STM32F746G-Disco says hello!" ANSI_BG_DEFAULT "\n");
-    printf("zwykly printf tez dziala :)\n");
     lcd_start();
     //  MX_DriverVbusFS(0);
     /* USER CODE END 2 */
@@ -335,7 +338,6 @@ int main(void) {
     /* USER CODE BEGIN WHILE */
     while (1) {
         /* USER CODE END WHILE */
-
         /* USER CODE BEGIN 3 */
     }
     /* USER CODE END 3 */
@@ -1796,24 +1798,25 @@ static void lcd_start(void) {
 }
 
 void draw_background(void) {
-    //enter your code to draw a beautiful background picture :)
-
     BSP_LCD_SelectLayer(LCD_LAYER_BG);
     BSP_LCD_Clear(LCD_COLOR_WHITE);
-    BSP_LCD_SetBackColor(LCD_COLOR_WHITE);
+    BSP_LCD_SetBackColor((uint32_t)0xFFF2E0C9);
 
-    BSP_LCD_SetTextColor(((uint32_t)0xFFFFFF00));
-    BSP_LCD_FillCircle(50, 50, 40);
+    BSP_LCD_SetTextColor((uint32_t)0xFFA69279);
 
-    xprintf("%lx\n", BSP_LCD_ReadPixel(50, 60));
+    int squaresize = 16;
+    int offset = 2;
 
-    BSP_LCD_SetTextColor(LCD_COLOR_RED);
-    BSP_LCD_DrawRect(150, 150, 30, 80);
-
-    BSP_LCD_SetTextColor(LCD_COLOR_CYAN);
-
-    Point points[4] = {{260, 60}, {380, 60}, {380, 200}, {260, 250}};
-    BSP_LCD_FillPolygon(points, 4);
+    for (int x = 3 * squaresize; x < LCD_X_SIZE - 3 * squaresize; x += squaresize) {
+        for (int y = 3 * squaresize; y < LCD_Y_SIZE - 3 * squaresize; y += squaresize) {
+            if ((x / squaresize + y / squaresize) % 2 == 0) {
+                BSP_LCD_DrawCircle(x + squaresize / 2, y + squaresize / 2, squaresize / 2 - offset);
+            } else {
+                BSP_LCD_DrawLine(x + offset, y + offset, x + squaresize - offset, y + squaresize - offset);
+                BSP_LCD_DrawLine(x + offset, y + squaresize - offset, x + squaresize - offset, y + offset);
+            }
+        }
+    }
 }
 
 int moveCursor(int xShift, int yShift) {
@@ -1836,7 +1839,7 @@ int moveCursor(int xShift, int yShift) {
 
 void putcursor(void) {
     if (cursorUpd) {
-        const int SIZE = 40;
+        const int SIZE = 5;
 
         if (cursorX <= SIZE) cursorX = SIZE + 1;
         if (cursorX >= (LCD_X_SIZE - SIZE - 1)) cursorX = LCD_X_SIZE - SIZE - 1;
@@ -1844,9 +1847,18 @@ void putcursor(void) {
         if (cursorY >= (LCD_Y_SIZE - SIZE - 1)) cursorY = LCD_Y_SIZE - SIZE - 1;
 
         BSP_LCD_SelectLayer(LCD_LAYER_FG);
-        BSP_LCD_Clear(LCD_COLOR_WHITE);
-        BSP_LCD_SetTextColor((uint32_t)0x34FF00FF);
+        BSP_LCD_SetTextColor((uint32_t)0x340000FF);
         BSP_LCD_FillCircle(cursorX, cursorY, SIZE);
+
+        int idx = point_inside(cursorX, cursorY, figures, current_figure_idx);
+        if (idx != -1) {
+            printf("Removing figure with idx %d \n", idx);
+            score_sum += figures[idx].score;
+            for (int k = idx; k < current_figure_idx - 1; k++) {
+                figures[k] = figures[k + 1];
+            }
+            current_figure_idx -= 1;
+        }
 
         cursorUpd = 0;
     }
@@ -1972,9 +1984,9 @@ int serialTestComm(char key) {
 void StartDefaultTask(void const *argument) {
     /* init code for LWIP */
     MX_LWIP_Init();
-
     /* init code for USB_HOST */
     MX_USB_HOST_Init();
+
     /* USER CODE BEGIN 5 */
     draw_background();
 
@@ -1998,15 +2010,61 @@ void StartDefaultTask(void const *argument) {
         netconn_thread, http_server_netconn_thread, osPriorityNormal, 0, 1024);
     osThreadCreate(osThread(netconn_thread), NULL);
 #endif
+
     static ApplicationTypeDef previousAppli_state;
 
+    int shape, color_code;
+    time_t t;
+    srand((unsigned)time(&t));
+
+    u_int32_t color;
+    int x, y;
+    int score_number;
+    int time_to_live;
+
+    // in each iteration of the main loop we check if user touched one of the figures
+    // in each iteration we redraw all figures on the foreground
+    // in each two iterations we add new figure
+
     /* Infinite loop */
-    for (;;) {
+    for (int i = 0;; i++) {
         HAL_IWDG_Refresh(&hiwdg);
         vTaskDelay(5);
         LD1_TOGGLE; /* Just blink to say "I'm alive" */
 
         //a recommended line to read the touch screen :)
+
+        // DRAWING FIGURES
+
+        // printf("-------------------------------------------\n");
+        // printf("Iteration number: %d \n", i);
+        // printf("Curr idx: %d \n", current_figure_idx);
+
+        // printf("Drawing figures:\n");
+        // for (int j = 0; j < current_figure_idx; j++) {
+        //     printf("  *  x: %d, y: %d, type: %d, ttl: %d\n", figures[j].x, figures[j].y, figures[j].type, figures[j].time_to_live);
+        // }
+
+        BSP_LCD_SelectLayer(LCD_LAYER_FG);
+        BSP_LCD_Clear(LCD_COLOR_WHITE);
+        draw_score(score_sum);
+
+        for (int j = 0; j < current_figure_idx; j++) {
+            if (figures[j].time_to_live <= 0) {
+                for (int k = j; k < current_figure_idx - 1; k++) {
+                    figures[k] = figures[k + 1];
+                }
+                current_figure_idx -= 1;
+                j -= 1;
+            } else {
+                draw_shape(figures[j].x, figures[j].y, figures[j].type, figures[j].color);
+                figures[j].time_to_live -= 1;
+            }
+        }
+
+        // printf("\n");
+
+        // CURSOR
 
         TS_StateTypeDef TS_State;
         BSP_TS_GetState(&TS_State);
@@ -2015,7 +2073,40 @@ void StartDefaultTask(void const *argument) {
             cursorY = TS_State.touchY[0];
             cursorUpd = 1;
         }
+
         putcursor();
+
+        // GENERATE NEW FIGURE
+
+        if (i % 2 == 0 && current_figure_idx < max_figures_number) {
+            printf("\nGenerating new figure: \n");
+            shape = rand() % 3;
+            color_code = rand() % 2;
+            time_to_live = rand() % 10;
+            if (color_code == 1) {
+                color = (uint32_t)0xFFE74C3B;  // red
+            } else {
+                color = (uint32_t)0xFF23B99A;  // green
+            }
+            printf(" - shape number: %d \n", shape);
+            printf(" - color code: %d \n", color_code);
+
+            x = rand() % max_width;
+            y = rand() % max_height;
+
+            printf(" - x cord: %d \n", x);
+            printf(" - y cord: %d \n", y);
+
+            score_number = 3 - shape;
+
+            if (color_code == 1) {
+                score_number *= (-1);
+            }
+
+            Figure new_figure = {x, y, shape, score_number, time_to_live, color};
+            figures[current_figure_idx] = new_figure;
+            current_figure_idx += 1;
+        }
 
         char key = debug_inkey();
         serialTestComm(key);
@@ -2100,3 +2191,96 @@ void assert_failed(uint8_t *file, uint32_t line) {
 #endif /* USE_FULL_ASSERT */
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
+
+void draw_shape(int x, int y, int shape, u_int32_t color) {  // draw it on FG
+    BSP_LCD_SetTextColor(color);
+
+    if (shape == 0) {
+        // generate circle
+        BSP_LCD_FillCircle(x, y, circle_radius);
+    } else if (shape == 1) {
+        // generate square
+        BSP_LCD_FillCircle(x, y, square_size, square_size);
+    } else {
+        // generate triangle
+        Point points[3] = {{x, y}, {x + triangle_height / 2, y + triangle_height}, {x - triangle_height / 2, y + triangle_height}};
+        BSP_LCD_FillPolygon(points, 3);
+    }
+}
+
+void draw_score(int score) {
+    uint8_t string[20] = {0};
+
+    sprintf((char *)string, "score: %+05d");
+
+    BSP_LCD_SetTextColor((uint32_t)0x6892A6);
+    BSP_LCD_SetFont(&Font24);
+    BSP_LCD_DisplayStringAt(max_width - 50, max_height - 100, string, RIGHT_MODE)
+}
+
+int inside_rect(int rect_x, int rect_y, int x, int y) {
+    if (x > rect_x && x < rect_x + square_size && y > rect_y && y < rect_y + square_size) {
+        return 1;
+    }
+    return 0;
+}
+
+int inside_circle(int circle_x, int circle_y, int x, int y) {
+    if ((x - circle_x) * (x - circle_x) + (y - circle_y) * (y - circle_y) > circle_radius * circle_radius)
+        return 0;
+    return 1;
+}
+
+int sign(int p1_x, int p1_y, int p2_x, int p2_y, int p3_x, int p3_y) {
+    return (p1_x - p3_x) * (p2_y - p3_y) - (p2_x - p3_x) * (p1_y - p3_y);
+}
+
+int inside_triangle(int triangle_x, int triangle_y, int x, int y) {
+    int p1_x = triangle_x;
+    int p1_y = triangle_y;
+    int p2_x = x + triangle_height / 2;
+    int p2_y = y + triangle_height;
+    int p3_x = x - triangle_height / 2;
+    int p3_y = y + triangle_height;
+
+    int d1, d2, d3;
+
+    d1 = sign(x, y, p1_x, p1_y, p2_x, p2_y);
+    d2 = sign(x, y, p2_x, p2_y, p3_x, p3_y);
+    d3 = sign(x, y, p3_x, p3_y, p1_x, p1_y);
+
+    int has_neg = (d1 < 0) || (d2 < 0) || (d3 < 0);
+    int has_pos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+
+    return !(has_neg && has_pos);
+}
+
+// returns index of touched figure, -1 otherwise
+int point_inside(int x, int y, Figure figures[max_figures_number], int max_figures_idx) {
+    printf("Checking if point (%d, %d) is inside some figure\n", x, y);
+
+    for (int i = max_figures_idx - 1; i >= 0; i--) {
+        int type = figures[i].type;
+        int fig_x = figures[i].x;
+        int fig_y = figures[i].y;
+
+        if (type == 0) {
+            if (inside_circle(fig_x, fig_y, x, y)) {
+                printf("Inside circle!\n");
+                return i;
+            }
+        } else if (type == 1) {
+            if (inside_rect(fig_x, fig_y, x, y)) {
+                printf("Inside square!\n");
+                return i;
+            }
+        } else {
+            if (inside_triangle(fig_x, fig_y, x, y)) {
+                printf("Inside triangle!\n");
+                return i;
+            }
+        }
+    }
+    printf("Outside!\n");
+    return -1;
+}

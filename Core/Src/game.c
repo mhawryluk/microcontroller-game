@@ -44,8 +44,8 @@ int inside_rect(int rect_x, int rect_y, int x, int y) {
 }
 
 int inside_circle(int circle_x, int circle_y, int x, int y) {
-    if(abs(x - circle_x) > circle_radius) return 0;
-    if(abs(y - circle_y) > circle_radius) return 0;
+    if ((x - circle_x)*(x - circle_x) + (y - circle_y)*(y - circle_y) > circle_radius*circle_radius) 
+        return 0;
     return 1;
 }
 
@@ -172,9 +172,9 @@ int main() {
             color_code = rand() % 2;
             time_to_live = rand() % 10;
             if (color_code == 1) {
-                color = (uint32_t) 0xFFFF0000; // red
+                color = (uint32_t) 0xFFE74C3B; // red
             } else {
-                color = (uint32_t) 0xFF00FF00; // green
+                color = (uint32_t) 0xFF23B99A; // green
             }
             printf(" - shape number: %d \n", shape);
             printf(" - color code: %d \n", color_code);
