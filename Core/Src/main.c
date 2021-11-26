@@ -146,11 +146,11 @@ extern FIL SDFile;     /* File object for SD */
 int max_width = LCD_X_SIZE;
 int max_height = LCD_Y_SIZE;
 
-const int figure_size = 80;
+const int figure_size = 50;
 const int circle_radius = figure_size / 2;
 const int square_size = figure_size;
 const int triangle_height = figure_size;
-const int max_figures_number = 10;
+#define max_figures_number 10
 
 typedef struct {
     int16_t x;
@@ -172,6 +172,14 @@ int inside_circle(int circle_x, int circle_y, int x, int y);
 int sign(int p1_x, int p1_y, int p2_x, int p2_y, int p3_x, int p3_y);
 int inside_triangle(int triangle_x, int triangle_y, int x, int y);
 int point_inside(int x, int y, Figure figures[max_figures_number], int max_figures_idx);
+
+int numbers[19] = {17263, 223525, 2626, 113883, 35, 23464, 63767, 33, 6767, 90000,
+    677868,11111, 22, 8678678, 4566, 5645645, 3525, 23723, 34265};
+
+int mrand(int index){
+  return rand();
+//  return numbers[index%19];
+}
 
 void USBH_HID_EventCallback(USBH_HandleTypeDef *phost) {
     xprintf("hid callback: ");
@@ -1839,12 +1847,15 @@ int moveCursor(int xShift, int yShift) {
 
 void putcursor(void) {
     if (cursorUpd) {
+
         const int SIZE = 5;
 
         if (cursorX <= SIZE) cursorX = SIZE + 1;
         if (cursorX >= (LCD_X_SIZE - SIZE - 1)) cursorX = LCD_X_SIZE - SIZE - 1;
         if (cursorY <= SIZE) cursorY = SIZE + 1;
         if (cursorY >= (LCD_Y_SIZE - SIZE - 1)) cursorY = LCD_Y_SIZE - SIZE - 1;
+
+        xprintf("%d %d\n", cursorX, cursorY);
 
         BSP_LCD_SelectLayer(LCD_LAYER_FG);
         BSP_LCD_SetTextColor((uint32_t)0x340000FF);
@@ -1858,6 +1869,8 @@ void putcursor(void) {
                 figures[k] = figures[k + 1];
             }
             current_figure_idx -= 1;
+            BSP_LCD_Clear(LCD_COLOR_WHITE);
+                            draw_score(score_sum);
         }
 
         cursorUpd = 0;
@@ -2015,19 +2028,23 @@ void StartDefaultTask(void const *argument) {
 
     int shape, color_code;
     time_t t;
-    srand((unsigned)time(&t));
+//    srand((unsigned)time(&t));
 
     u_int32_t color;
     int x, y;
-    int score_number;
+    int score_number = 0;
     int time_to_live;
 
     // in each iteration of the main loop we check if user touched one of the figures
     // in each iteration we redraw all figures on the foreground
     // in each two iterations we add new figure
 
+    int rindex = 0;
+
     /* Infinite loop */
     for (int i = 0;; i++) {
+        rindex %= 10000;
+
         HAL_IWDG_Refresh(&hiwdg);
         vTaskDelay(5);
         LD1_TOGGLE; /* Just blink to say "I'm alive" */
@@ -2046,8 +2063,9 @@ void StartDefaultTask(void const *argument) {
         // }
 
         BSP_LCD_SelectLayer(LCD_LAYER_FG);
-        BSP_LCD_Clear(LCD_COLOR_WHITE);
+//        BSP_LCD_Clear(LCD_COLOR_WHITE);
         draw_score(score_sum);
+
 
         for (int j = 0; j < current_figure_idx; j++) {
             if (figures[j].time_to_live <= 0) {
@@ -2056,11 +2074,15 @@ void StartDefaultTask(void const *argument) {
                 }
                 current_figure_idx -= 1;
                 j -= 1;
+
+                BSP_LCD_Clear(LCD_COLOR_WHITE);
+                draw_score(score_sum);
             } else {
                 draw_shape(figures[j].x, figures[j].y, figures[j].type, figures[j].color);
                 figures[j].time_to_live -= 1;
             }
         }
+
 
         // printf("\n");
 
@@ -2076,26 +2098,33 @@ void StartDefaultTask(void const *argument) {
 
         putcursor();
 
+
         // GENERATE NEW FIGURE
 
-        if (i % 2 == 0 && current_figure_idx < max_figures_number) {
+        if (i % 100 == 0 && current_figure_idx < max_figures_number) {
             printf("\nGenerating new figure: \n");
-            shape = rand() % 3;
-            color_code = rand() % 2;
-            time_to_live = rand() % 10;
+            shape = mrand(rindex) % 3;
+            rindex++;
+            color_code = mrand(rindex) % 2;
+            rindex++;
+            time_to_live = mrand(rindex) % 10 * 50;
+            rindex++;
+
             if (color_code == 1) {
                 color = (uint32_t)0xFFE74C3B;  // red
             } else {
                 color = (uint32_t)0xFF23B99A;  // green
             }
-            printf(" - shape number: %d \n", shape);
-            printf(" - color code: %d \n", color_code);
+            xprintf(" - shape number: %d \n", shape);
+            xprintf(" - color code: %d \n", color_code);
 
-            x = rand() % max_width;
-            y = rand() % max_height;
+            x = mrand(rindex)%(max_width - 100) + 25;
+            rindex++;
+            y = mrand(rindex)%(max_height- 80) + 20;
+            rindex++;
 
-            printf(" - x cord: %d \n", x);
-            printf(" - y cord: %d \n", y);
+            xprintf(" - x cord: %d \n", x);
+           xprintf(" - y cord: %d \n", y);
 
             score_number = 3 - shape;
 
@@ -2108,35 +2137,36 @@ void StartDefaultTask(void const *argument) {
             current_figure_idx += 1;
         }
 
-        char key = debug_inkey();
-        serialTestComm(key);
 
-        if (previousAppli_state != Appli_state) {
-            if (Appli_state == APPLICATION_READY) {
-                HID_TypeTypeDef hiddev = USBH_HID_GetDeviceType(&hUsbHostFS);
-                xprintf("Appli_state is now APPLICATION_READY, detected device: ");
-                switch (hiddev) {
-                    case HID_MOUSE: {
-                        xprintf("mouse\n");
-                        USBH_HID_MouseInit(&hUsbHostFS);
-                        break;
-                    }
-                    case HID_KEYBOARD: {
-                        xprintf("keyboard\n");
-                        USBH_HID_KeybdInit(&hUsbHostFS);
-                        break;
-                    }
-                    case HID_UNKNOWN: {
-                        xprintf("unknown or not supported by the firmware driver.\n");
-                        vTaskDelay(1000);
-                        xprintf("Hey, it's just firmware - not Linux :P\n");
-                        break;
-                    }
-                }
-            }
-
-            previousAppli_state = Appli_state;
-        }
+//        char key = debug_inkey();
+//        serialTestComm(key);
+//
+//        if (previousAppli_state != Appli_state) {
+//            if (Appli_state == APPLICATION_READY) {
+//                HID_TypeTypeDef hiddev = USBH_HID_GetDeviceType(&hUsbHostFS);
+//                xprintf("Appli_state is now APPLICATION_READY, detected device: ");
+//                switch (hiddev) {
+//                    case HID_MOUSE: {
+//                        xprintf("mouse\n");
+//                        USBH_HID_MouseInit(&hUsbHostFS);
+//                        break;
+//                    }
+//                    case HID_KEYBOARD: {
+//                        xprintf("keyboard\n");
+//                        USBH_HID_KeybdInit(&hUsbHostFS);
+//                        break;
+//                    }
+//                    case HID_UNKNOWN: {
+//                        xprintf("unknown or not supported by the firmware driver.\n");
+//                        vTaskDelay(1000);
+//                        xprintf("Hey, it's just firmware - not Linux :P\n");
+//                        break;
+//                    }
+//                }
+//            }
+//
+//            previousAppli_state = Appli_state;
+//        }
     }
     /* USER CODE END 5 */
 }
@@ -2200,9 +2230,10 @@ void draw_shape(int x, int y, int shape, u_int32_t color) {  // draw it on FG
         BSP_LCD_FillCircle(x, y, circle_radius);
     } else if (shape == 1) {
         // generate square
-        BSP_LCD_FillCircle(x, y, square_size, square_size);
+        BSP_LCD_FillRect(x, y, square_size, square_size);
     } else {
         // generate triangle
+      xprintf("%d %d %d %d %d %d", x, y, x + triangle_height / 2, y + triangle_height, x - triangle_height / 2, y + triangle_height);
         Point points[3] = {{x, y}, {x + triangle_height / 2, y + triangle_height}, {x - triangle_height / 2, y + triangle_height}};
         BSP_LCD_FillPolygon(points, 3);
     }
@@ -2211,11 +2242,11 @@ void draw_shape(int x, int y, int shape, u_int32_t color) {  // draw it on FG
 void draw_score(int score) {
     uint8_t string[20] = {0};
 
-    sprintf((char *)string, "score: %+05d");
+    sprintf((char *)string, "score: %+05d", score);
 
-    BSP_LCD_SetTextColor((uint32_t)0x6892A6);
+    BSP_LCD_SetTextColor((uint32_t)0xFF6892A6);
     BSP_LCD_SetFont(&Font24);
-    BSP_LCD_DisplayStringAt(max_width - 50, max_height - 100, string, RIGHT_MODE)
+    BSP_LCD_DisplayStringAt(max_width - 50, max_height - 100, string, RIGHT_MODE);
 }
 
 int inside_rect(int rect_x, int rect_y, int x, int y) {
@@ -2257,7 +2288,7 @@ int inside_triangle(int triangle_x, int triangle_y, int x, int y) {
 
 // returns index of touched figure, -1 otherwise
 int point_inside(int x, int y, Figure figures[max_figures_number], int max_figures_idx) {
-    printf("Checking if point (%d, %d) is inside some figure\n", x, y);
+    xprintf("Checking if point (%d, %d) is inside some figure\n", x, y);
 
     for (int i = max_figures_idx - 1; i >= 0; i--) {
         int type = figures[i].type;
@@ -2266,21 +2297,22 @@ int point_inside(int x, int y, Figure figures[max_figures_number], int max_figur
 
         if (type == 0) {
             if (inside_circle(fig_x, fig_y, x, y)) {
-                printf("Inside circle!\n");
+                xprintf("Inside circle!\n");
                 return i;
             }
         } else if (type == 1) {
             if (inside_rect(fig_x, fig_y, x, y)) {
-                printf("Inside square!\n");
+                xprintf("Inside square!\n");
                 return i;
             }
         } else {
             if (inside_triangle(fig_x, fig_y, x, y)) {
-                printf("Inside triangle!\n");
+                xprintf("Inside triangle!\n");
                 return i;
             }
         }
     }
-    printf("Outside!\n");
+
+    xprintf("Outside!\n");
     return -1;
 }
